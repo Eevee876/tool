@@ -12,7 +12,7 @@ export default ({ mode }) => {
   const { VITE_PUBLIC_PATH } = viteEnv
   return {
     /** 打包时根据实际情况修改 base */
-    base: "/tool",
+    base: "/tool/",
     // base: "./",
     resolve: {
       alias: {
