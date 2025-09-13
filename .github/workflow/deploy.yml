@@ -1,50 +1,69 @@
-name: deploy
+# 将静态内容部署到 GitHub Pages 的简易工作流程
+name: Deploy static content to Pages
 
 on:
-  # 每当 push 到 main 分支时触发部署
-  # Deployment is triggered whenever a push is made to the main branch.
+  # 仅在推送到默认分支时运行。
   push:
-    branches: [main]
-  # 手动触发部署
-  # Manually trigger deployment
+    branches: ['main']
+
+  # 这个选项可以使你手动在 Action tab 页面触发工作流
   workflow_dispatch:
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+# 设置 GITHUB_TOKEN 的权限，以允许部署到 GitHub Pages。
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
+# 允许一个并发的部署
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  # 单次部署的工作描述
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
         with:
-          # “最近更新时间” 等 git 日志相关信息，需要拉取全部提交记录
-          # "Last updated time" and other git log-related information require fetching all commit records.
-          fetch-depth: 0
+          version: 7
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # 选择要使用的 node 版本
-          node-version: 20
-      
-      # 安装依赖
-      # Install dependencies
-      - name: Install Dependencies
-        run: npm ci
+          node-version: '24'
+          cache: 'pnpm'
 
-      # 运行构建脚本
-      # Run the build script
-      - name: Build site
-        run: npm run build
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
 
-      # 查看 workflow 的文档来获取更多信息
-      # @see https://github.com/crazy-max/ghaction-github-pages
-      - name: Deploy to GitHub Pages
-        uses: crazy-max/ghaction-github-pages@v4
+      - name: Build
+        run: pnpm run build
+
+      - name: Debug - List dist contents
+        run: |
+          echo "Checking if dist directory exists:"
+          ls -la
+          echo "Dist directory contents:"
+          ls -la dist/ || echo "Dist directory not found"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          # 部署到 gh-pages 分支
-          target_branch: gh-pages
-          # 部署目录
-          build_dir: dist
-        env:
-          # @see https://docs.github.com/cn/actions/reference/authentication-in-a-workflow#about-the-github_token-secret
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Upload dist repository
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
